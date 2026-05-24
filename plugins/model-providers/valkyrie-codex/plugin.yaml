@@ -1,0 +1,4 @@
+name: valkyrie-codex-provider
+kind: model-provider
+version: 0.1.0
+description: Surf Valkyrie Codex gateway.

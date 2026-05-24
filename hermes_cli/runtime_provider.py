@@ -260,6 +260,20 @@ def _parse_api_mode(raw: Any) -> Optional[str]:
     return None
 
 
+def _provider_profile_api_mode(provider: Optional[str]) -> str:
+    """Return the api_mode declared by a model-provider plugin, if any."""
+    normalized = (provider or "").strip().lower()
+    if not normalized:
+        return "chat_completions"
+    try:
+        from providers import get_provider_profile
+
+        profile = get_provider_profile(normalized)
+    except Exception:
+        profile = None
+    return _parse_api_mode(getattr(profile, "api_mode", None)) or "chat_completions"
+
+
 def _maybe_apply_codex_app_server_runtime(
     *,
     provider: str,
@@ -305,7 +319,7 @@ def _resolve_runtime_from_pool_entry(
     effective_model = (target_model or model_cfg.get("default") or "")
     base_url = (getattr(entry, "runtime_base_url", None) or getattr(entry, "base_url", None) or "").rstrip("/")
     api_key = getattr(entry, "runtime_api_key", None) or getattr(entry, "access_token", "")
-    api_mode = "chat_completions"
+    api_mode = _provider_profile_api_mode(provider)
     if provider == "openai-codex":
         api_mode = "codex_responses"
         base_url = base_url or DEFAULT_CODEX_BASE_URL
@@ -313,10 +327,10 @@ def _resolve_runtime_from_pool_entry(
         api_mode = "codex_responses"
         base_url = base_url or DEFAULT_XAI_OAUTH_BASE_URL
     elif provider == "qwen-oauth":
-        api_mode = "chat_completions"
+        api_mode = _provider_profile_api_mode(provider)
         base_url = base_url or DEFAULT_QWEN_BASE_URL
     elif provider == "google-gemini-cli":
-        api_mode = "chat_completions"
+        api_mode = _provider_profile_api_mode(provider)
         base_url = base_url or "cloudcode-pa://google"
     elif provider == "minimax-oauth":
         # MiniMax OAuth tokens are valid only against the Anthropic Messages
@@ -1169,14 +1183,15 @@ def _resolve_explicit_runtime(
             if not base_url:
                 base_url = creds.get("base_url", "").rstrip("/")
 
-        api_mode = "chat_completions"
+        api_mode = _provider_profile_api_mode(provider)
         if provider == "copilot":
             api_mode = _copilot_runtime_api_mode(model_cfg, api_key)
         elif provider == "xai":
             api_mode = "codex_responses"
         else:
+            configured_provider = str(model_cfg.get("provider") or "").strip().lower()
             configured_mode = _parse_api_mode(model_cfg.get("api_mode"))
-            if configured_mode:
+            if configured_mode and _provider_supports_explicit_api_mode(provider, configured_provider):
                 api_mode = configured_mode
             else:
                 # Auto-detect from URL (Anthropic /anthropic suffix,
@@ -1611,7 +1626,7 @@ def resolve_runtime_provider(
         if cfg_provider == provider:
             cfg_base_url = (model_cfg.get("base_url") or "").strip().rstrip("/")
         base_url = cfg_base_url or creds.get("base_url", "").rstrip("/")
-        api_mode = "chat_completions"
+        api_mode = _provider_profile_api_mode(provider)
         if provider == "copilot":
             api_mode = _copilot_runtime_api_mode(model_cfg, creds.get("api_key", ""))
         elif provider == "xai":

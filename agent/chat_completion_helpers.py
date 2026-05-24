@@ -294,12 +294,24 @@ def build_api_kwargs(agent, api_messages: list) -> dict:
         )
         is_codex_backend = (
             agent.provider == "openai-codex"
+            or agent.provider == "valkyrie-codex"
             or (
                 agent._base_url_hostname == "chatgpt.com"
                 and "/backend-api/codex" in agent._base_url_lower
             )
+            or (
+                agent._base_url_hostname == "valkyrie.ask.surf"
+                and "/codex" in agent._base_url_lower
+            )
         )
-        is_xai_responses = agent.provider in {"xai", "xai-oauth"} or agent._base_url_hostname == "api.x.ai"
+        is_xai_responses = (
+            agent.provider in {"xai", "xai-oauth"}
+            or agent._base_url_hostname == "api.x.ai"
+            or (
+                agent._base_url_hostname == "valkyrie.ask.surf"
+                and "/xai" in agent._base_url_lower
+            )
+        )
         _msgs_for_codex = agent._prepare_messages_for_non_vision_model(api_messages)
 
         # xAI's /responses endpoint rejects ``pattern`` and ``format`` keywords
